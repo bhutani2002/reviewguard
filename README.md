@@ -29,7 +29,7 @@ ReviewGuard introduces a secure, structured, memory-backed multi-agent PR review
 
 ## ⚙️ System Architecture
 
-ReviewGuard is orchestrated as a 7-node ADK 2.0 Workflow graph. It receives PR details from GitHub Actions, fetches files, consults the memory store, executes the review pipeline, and outputs results.
+ReviewGuard is orchestrated as an 8-node ADK 2.0 Workflow graph. It receives PR details from GitHub Actions, fetches files, consults the memory store, executes the review pipeline, and outputs results.
 
 ### 🖼️ System Design Architecture
 
@@ -72,9 +72,9 @@ graph TD
 *   **AI Inference & LLM Gateways**: Google Gemini (`gemini-2.5-flash`), Groq (`llama-3.3-70b-versatile`), and OpenRouter API (`gemma-2-9b-it`, `llama-3.3-70b-instruct`) fallback router.
 *   **Repository Interaction**: Model Context Protocol (MCP) GitHub server connection.
 *   **Custom Agent Skills**:
-    *   **[`complexity_scorer`]**: Python `ast` syntax-tree analysis parsing cyclomatic complexity and code structures.
-    *   **[`spec_compliance_checker`]**: Clean extractor of acceptance criteria from issue bodies.
-    *   **[`commit_pattern_analyzer`]**: Semantic miner extracting code guidelines from closed PR comments.
+    *   **`complexity_scorer`**: Python `ast` syntax-tree analysis parsing cyclomatic complexity and code structures.
+    *   **`spec_compliance_checker`**: Clean extractor of acceptance criteria from issue bodies.
+    *   **`commit_pattern_analyzer`**: Semantic miner extracting code guidelines from closed PR comments.
 
 ---
 
@@ -156,4 +156,4 @@ This executes the scenarios, verifies the security and routing compliance, and w
 
 ### NIST SP 800-53 Control Mapping
 *   **AC-3 (Access Enforcement)**: Enforces code check boundaries, preventing arbitrary repository mutation.
-*   **AU-2 (Event Logging)**: Generates a persistent audit log (`review-artifacts/`) mapping exactly which criteria passed, failed, or were bypassed.
+*   **AU-2 (Event Logging)**: Generates a persistent audit log (committed to the target repository's `review-artifacts/` directory) mapping exactly which criteria passed, failed, or were bypassed.
