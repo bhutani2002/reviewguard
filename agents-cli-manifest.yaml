@@ -1,0 +1,6 @@
+name: agent
+agent_module: agent.agent
+app_attribute: app
+playground_port: 8090
+acli_version: 1.0.0
+agent_directory: agent

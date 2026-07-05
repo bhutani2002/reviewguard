@@ -69,7 +69,7 @@ graph TD
 ## ⚙️ Tech Stack & Skills
 
 *   **Orchestration**: Google Agent Development Kit (ADK 2.0), Pydantic v2, FastAPI.
-*   **AI Inference & LLM Gateways**: Google Gemini (`gemini-2.5-flash`), Groq (`llama-3.3-70b-versatile`), and OpenRouter API (`gemma-2-9b-it`, `llama-3.3-70b-instruct`) fallback router.
+*   **AI Inference & LLM Gateways**: Google Gemini (`gemini-2.5-flash`), Groq (`llama-3.3-70b-versatile`, `llama3-70b-8192`), and OpenRouter (`llama-3.3-70b-instruct`) fallback chain router.
 *   **Repository Interaction**: Model Context Protocol (MCP) GitHub server connection.
 *   **Custom Agent Skills**:
     *   **`complexity_scorer`**: Python `ast` syntax-tree analysis parsing cyclomatic complexity and code structures.
@@ -128,6 +128,30 @@ make install
 | `make playground` | Launches the interactive Google ADK Developer UI |
 | `make playground-mock` | Launches the UI in mock mode (no API calls, reads local JSON datasets) |
 | `make eval-traces` | Runs the 4 mock evaluation scenarios and generates traces |
+
+### 5. Running the Local Developer Playground
+
+The Google ADK Developer UI provides an interactive web-based playground to trigger the agent, inspect execution states, and debug graph transitions.
+
+1. **Launch the Playground**:
+   * For **Live Mode** (connects to real APIs, requires environment keys):
+     ```bash
+     make playground
+     ```
+   * For **Mock Mode** (runs completely offline using local dataset files, requires no keys):
+     ```bash
+     make playground-mock
+     ```
+
+2. **Access the Web UI**:
+   * Open your browser and navigate to: **[http://127.0.0.1:8090/dev-ui/?app=app](http://127.0.0.1:8090/dev-ui/?app=app)**
+   * Select the `agent` folder from the dropdown menu in the interface.
+
+3. **Trigger Execution**:
+   * In the chat box, type the prompt/scenario you want to run:
+     * *Live Mode prompt example*: `Review PR #17 on demo-paymentservice`
+     * *Mock Mode prompt example*: `Review PR scenario: partial_pr`
+   * Watch the individual nodes in the graph execute, verify variable modifications in the **State panel** on the right, and approve/reject HITL notifications as they arise.
 
 ---
 

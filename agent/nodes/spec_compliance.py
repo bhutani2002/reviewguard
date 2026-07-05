@@ -108,8 +108,8 @@ async def spec_compliance_node(state: AgentState) -> AgentState:
     
     for idx, criterion in enumerate(state.acceptance_criteria):
         if idx > 0:
-            print("Sleeping 2 seconds to avoid LLM rate limit...")
-            await asyncio.sleep(2.0)
+            print("Sleeping 3 seconds to avoid LLM rate limit...")
+            await asyncio.sleep(3.0)
             
         prompt = f"""You are verifying whether a code change satisfies a specific acceptance criterion.
 

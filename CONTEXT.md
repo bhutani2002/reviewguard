@@ -7,7 +7,7 @@ antigravity:
     - commit-pattern-analyzer
   agent_module: agent.agent
   app_attribute: app
-  playground_url: http://127.0.0.1:8080/dev-ui/?app=app
+  playground_url: http://127.0.0.1:8090/dev-ui/?app=app
 ---
 
 # ReviewGuard — Antigravity Project Context
@@ -20,9 +20,9 @@ It is a confidence-aware, memory-backed agent that verifies PRs against spec AND
 
 ## Architecture
 
-7-node ADK 2.0 Workflow graph:
+8-node ADK 2.0 Workflow graph:
 SecurityScreenNode -> SpecReaderNode -> MemoryLoaderNode -> SpecComplianceNode
--> CodeReviewNode -> ConfidenceRouterNode -> AuditLogNode
+-> CodeReviewNode -> ConfidenceRouterNode -> AuditLogNode -> GitHubCommentNode
 
 ## Key constraints — always respect these
 

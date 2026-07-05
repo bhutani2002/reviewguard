@@ -8,7 +8,7 @@ RUN pip install uv && uv sync --no-dev
 COPY agent/ ./agent/
 
 # Cloud Run expects PORT env variable
-ENV PORT=8080
+ENV PORT=8090
 
-# Simple HTTP wrapper around the agent for webhook mode
-CMD ["uv", "run", "python", "-m", "agent.webhook_server"]
+# Starts the official ADK API server for the agent in this directory
+CMD ["uv", "run", "adk", "api_server", "--host", "0.0.0.0", "--port", "8090", "./"]

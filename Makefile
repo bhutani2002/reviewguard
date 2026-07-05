@@ -26,9 +26,9 @@ playground:
 	@echo "Starting ReviewGuard playground..."
 	@echo "Requires: GEMINI_API_KEY and GITHUB_TOKEN set in environment"
 	@echo ""
-	agents-cli playground
+	agents-cli playground --port 8090
 	@echo ""
-	@echo "✅  Open: http://127.0.0.1:8080/dev-ui/?app=app"
+	@echo "✅  Open: http://127.0.0.1:8090/dev-ui/?app=app"
 	@echo "    1. Select 'agent' folder from the dropdown"
 	@echo "    2. Type: Review PR #17 on demo-paymentservice"
 	@echo "    3. Watch each node execute in real time"
@@ -40,9 +40,9 @@ playground-mock:
 	@echo "Starting ReviewGuard in MOCK mode..."
 	@echo "No API keys needed — uses local eval datasets"
 	@echo ""
-	REVIEWGUARD_MOCK=true agents-cli playground
+	REVIEWGUARD_MOCK=true agents-cli playground --port 8090
 	@echo ""
-	@echo "✅  Open: http://127.0.0.1:8080/dev-ui/?app=app"
+	@echo "✅  Open: http://127.0.0.1:8090/dev-ui/?app=app"
 	@echo "    Type: Review PR scenario: partial_pr"
 
 # Single non-interactive run (for CI smoke test)

@@ -1,10 +1,17 @@
+import sys
 import os
+
+# Prevent ADK path-shadowing where agent.py is loaded as a flat module instead of a package.
+# Setting __path__ tells Python's import system to treat it as a package directory.
+if sys.modules.get("agent") and not hasattr(sys.modules["agent"], "__path__"):
+    sys.modules["agent"].__path__ = [os.path.dirname(os.path.abspath(__file__))]
+
 import json
 import asyncio
 import httpx
 import uuid
 from datetime import datetime
-from google.adk.workflow import Workflow, Edge
+from google.adk import Workflow, Event
 from google.adk.apps.app import App
 
 from agent.state import AgentState
@@ -19,16 +26,185 @@ from agent.nodes.audit_log import audit_log_node
 from agent.nodes.github_comment import github_comment_node
 from agent.nodes.security_alert import security_alert_node
 
+# Monkey-patch json.JSONEncoder.default to handle AgentState serialization
+import dataclasses
+_original_default = json.JSONEncoder.default
+def _custom_default(self, o):
+    if isinstance(o, AgentState) or dataclasses.is_dataclass(o):
+        return dataclasses.asdict(o)
+    return _original_default(self, o)
+json.JSONEncoder.default = _custom_default
+
+PLAYGROUND_ACTIVE = False
+CURRENT_PLAYGROUND_CTX = None
+
+# Node wrapper to deserialize dictionary state back into AgentState
+def wrap_node_func(func):
+    import inspect
+    if inspect.iscoroutinefunction(func):
+        async def async_wrapper(*args, **kwargs):
+            global PLAYGROUND_ACTIVE, CURRENT_PLAYGROUND_CTX
+            ctx = kwargs.get("ctx") or CURRENT_PLAYGROUND_CTX
+            new_args = list(args)
+            if new_args and isinstance(new_args[0], dict):
+                new_args[0] = AgentState(**new_args[0])
+            if "state" in kwargs and isinstance(kwargs["state"], dict):
+                kwargs["state"] = AgentState(**kwargs["state"])
+            res = await func(*new_args, **kwargs)
+            
+            # If native runner is active:
+            if PLAYGROUND_ACTIVE:
+                try:
+                    if CURRENT_PLAYGROUND_CTX and hasattr(CURRENT_PLAYGROUND_CTX, "state"):
+                        CURRENT_PLAYGROUND_CTX.state["state"] = res
+                except Exception:
+                    pass
+                if func.__name__ == "security_screen_node":
+                    try:
+                        if ctx is not None:
+                            ctx.route = "passed" if getattr(res, "security_passed", True) else "blocked"
+                    except Exception:
+                        pass
+            return res
+        return async_wrapper
+    else:
+        def sync_wrapper(*args, **kwargs):
+            global PLAYGROUND_ACTIVE, CURRENT_PLAYGROUND_CTX
+            ctx = kwargs.get("ctx") or CURRENT_PLAYGROUND_CTX
+            new_args = list(args)
+            if new_args and isinstance(new_args[0], dict):
+                new_args[0] = AgentState(**new_args[0])
+            if "state" in kwargs and isinstance(kwargs["state"], dict):
+                kwargs["state"] = AgentState(**kwargs["state"])
+            res = func(*new_args, **kwargs)
+            
+            # If native runner is active:
+            if PLAYGROUND_ACTIVE:
+                try:
+                    if CURRENT_PLAYGROUND_CTX and hasattr(CURRENT_PLAYGROUND_CTX, "state"):
+                        CURRENT_PLAYGROUND_CTX.state["state"] = res
+                except Exception:
+                    pass
+                if func.__name__ == "security_screen_node":
+                    try:
+                        if ctx is not None:
+                            ctx.route = "passed" if getattr(res, "security_passed", True) else "blocked"
+                    except Exception:
+                        pass
+            return res
+        return sync_wrapper
+
+for node_obj in [security_screen_node, spec_reader_node, memory_loader_node, 
+                 spec_compliance_node, code_review_node, confidence_router_node, 
+                 audit_log_node, github_comment_node, security_alert_node]:
+    node_obj._func = wrap_node_func(node_obj._func)
+
 # ── Mock mode warning ──────────────────────────────────────────────────────────
 if MOCK_MODE:
     print("[WARNING] ReviewGuard running in MOCK mode - using local fixtures")
     print("    Set REVIEWGUARD_MOCK=false to use real GitHub MCP and Gemini")
 
+def parse_state_from_message(message: str) -> AgentState:
+    import re
+    # Check if they specified a mock scenario
+    mock_match = re.search(r"scenario:\s*([\w_-]+)", message, re.IGNORECASE)
+    scenario_name = mock_match.group(1) if mock_match else None
+    
+    if not scenario_name and any(sc in message.lower() for sc in ["partial_pr", "good_pr", "injection_pr", "secret_leak"]):
+        for sc in ["partial_pr", "good_pr", "injection_pr", "secret_leak"]:
+            if sc in message.lower():
+                scenario_name = sc
+                break
+                
+    if scenario_name or MOCK_MODE:
+        scenario_path = f"evals/datasets/{scenario_name or 'partial_pr'}.json"
+        try:
+            with open(scenario_path, "r", encoding="utf-8") as f:
+                scenario = json.load(f)
+            inp = scenario["input"]
+            return AgentState(
+                pr_number=inp["pr_number"],
+                pr_title=inp["pr_title"],
+                pr_body=inp.get("pr_body", ""),
+                pr_diff="",
+                linked_issue_number=None,
+                repo_owner=inp["repo_owner"],
+                repo_name=inp["repo_name"],
+                pr_branch="main",
+                run_id=str(uuid.uuid4())
+            )
+        except Exception:
+            pass
+
+    # Live Mode fallback: extract PR number and repo from message
+    pr_match = re.search(r"#?(\d+)", message)
+    pr_num = int(pr_match.group(1)) if pr_match else 14
+    
+    repo_match = re.search(r"on\s+([\w-]+)", message, re.IGNORECASE)
+    repo_name = repo_match.group(1) if repo_match else os.environ.get("REPO_NAME", "demo-paymentservice")
+    
+    return AgentState(
+        pr_number=pr_num,
+        pr_title="",
+        pr_body="",
+        pr_diff="",
+        linked_issue_number=None,
+        repo_owner=os.environ.get("REPO_OWNER", "bhutani2002"),
+        repo_name=repo_name,
+        pr_branch=os.environ.get("PR_BRANCH", "main"),
+        run_id=str(uuid.uuid4())
+    )
+
 # Define CustomWorkflow to support direct state execution without Pydantic exceptions
 class CustomWorkflow(Workflow):
     def run(self, *args, **kwargs):
+        global PLAYGROUND_ACTIVE, CURRENT_PLAYGROUND_CTX
+
         if "ctx" in kwargs or "node_input" in kwargs:
-            return super().run(*args, **kwargs)
+            PLAYGROUND_ACTIVE = True
+            CURRENT_PLAYGROUND_CTX = kwargs.get("ctx")
+            ctx = CURRENT_PLAYGROUND_CTX
+            node_input = kwargs.get("node_input")
+            
+            message = ""
+            # Extract user message from Content object
+            if hasattr(node_input, "parts") and len(node_input.parts) > 0:
+                message = getattr(node_input.parts[0], "text", "") or ""
+            
+            # Fallback to metadata displayName
+            if not message and ctx and hasattr(ctx, "state"):
+                try:
+                    metadata = ctx.state.get("__session_metadata__", {})
+                    if isinstance(metadata, dict):
+                        message = metadata.get("displayName", "")
+                except Exception:
+                    pass
+                
+            if not isinstance(message, str):
+                message = str(message)
+                
+            if not message or message == "None" or len(message.strip()) == 0:
+                message = "Review PR scenario: partial_pr"
+                
+            state = parse_state_from_message(message)
+            
+            async def playground_generator():
+                result = await custom_run(state)
+                # Inject result into ctx state
+                if ctx and hasattr(ctx, "state"):
+                    try:
+                        ctx.state["state"] = result
+                    except Exception as e:
+                        print(f"Error setting state on ctx.state: {e}")
+                
+                # Yield flat event representing the final state to populate playground panel
+                import dataclasses
+                from google.adk import Event
+                state_dict = dataclasses.asdict(result)
+                yield Event(output=state_dict, state=state_dict)
+
+            return playground_generator()
+
         # Direct run call: execute sequential node runner
         state = args[0] if args else kwargs.get("state")
         return custom_run(state)
@@ -38,7 +214,12 @@ root_workflow = CustomWorkflow(
     name="reviewguard_workflow",
     edges=[
         ("START", security_screen_node, {"passed": spec_reader_node, "blocked": security_alert_node}),
-        (spec_reader_node, memory_loader_node, spec_compliance_node, code_review_node, confidence_router_node, audit_log_node, github_comment_node)
+        (spec_reader_node, memory_loader_node),
+        (memory_loader_node, spec_compliance_node),
+        (spec_compliance_node, code_review_node),
+        (code_review_node, confidence_router_node),
+        (confidence_router_node, audit_log_node),
+        (audit_log_node, github_comment_node)
     ]
 )
 
@@ -122,7 +303,7 @@ root_agent = root_workflow
 
 # ── Playground / agents-cli discovery ────────────────────────────────────────
 app = App(
-    name="reviewguard",
+    name="agent",
     root_agent=root_agent,
 )
 
@@ -178,4 +359,4 @@ if __name__ == "__main__":
         run_id=str(uuid.uuid4())
     )
 
-    asyncio.run(root_agent.run(state))
+    asyncio.run(custom_run(state))

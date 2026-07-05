@@ -13,3 +13,8 @@ review-artifacts/
 # Diagnostics
 artifacts/logs/reviewguard_diag_*.log
 artifacts/logs/reviewguard_error_*.log
+
+# Local ADK Session Stores
+*.db
+agent/.adk/
+agent/adk/
