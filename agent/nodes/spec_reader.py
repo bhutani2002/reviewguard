@@ -28,6 +28,22 @@ async def spec_reader_node(state: AgentState) -> AgentState:
         except Exception as e:
             print(f"Error fetching PR files via MCP: {e}")
 
+    # 2. Fetch PR details (title/body) if missing or manual fallback
+    if not MOCK_MODE and (not state.pr_title or "Manual" in state.pr_title):
+        print(f"Fetching PR details for PR #{state.pr_number} via GitHub MCP...")
+        try:
+            pr_data = await call_github_mcp("get_pull_request", {
+                "owner": state.repo_owner,
+                "repo": state.repo_name,
+                "pull_number": state.pr_number
+            })
+            if isinstance(pr_data, dict):
+                state.pr_title = pr_data.get("title", state.pr_title)
+                state.pr_body = pr_data.get("body", state.pr_body)
+                print(f"Loaded real PR title: '{state.pr_title}'")
+        except Exception as e:
+            print(f"Error fetching PR details via MCP: {e}")
+
     if not state.linked_issue_number:
         match = re.search(r"(?:fixes|closes|resolves|issue)\s*#?(\d+)", (state.pr_body or "") + " " + (state.pr_title or ""), re.IGNORECASE)
         if match:
