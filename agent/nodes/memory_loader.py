@@ -63,7 +63,8 @@ async def memory_loader_node(state: AgentState) -> AgentState:
             file_data = await call_github_mcp("get_file_contents", {
                 "owner": state.repo_owner,
                 "repo": state.repo_name,
-                "path": "review-artifacts/memory/team-decisions.json"
+                "path": "review-artifacts/memory/team-decisions.json",
+                "branch": state.pr_branch
             })
             content_str = extract_file_content(file_data)
             if content_str:
@@ -123,7 +124,8 @@ async def memory_loader_node(state: AgentState) -> AgentState:
             history_data = await call_github_mcp("get_file_contents", {
                 "owner": state.repo_owner,
                 "repo": state.repo_name,
-                "path": "review-artifacts/memory/pattern-history.json"
+                "path": "review-artifacts/memory/pattern-history.json",
+                "branch": state.pr_branch
             })
             content_str = extract_file_content(history_data)
             sha = history_data.get("sha") if isinstance(history_data, dict) else None
@@ -162,12 +164,13 @@ async def memory_loader_node(state: AgentState) -> AgentState:
             }
             payload_str = json.dumps(history_payload, indent=2)
             try:
-                await call_github_mcp("create_or_update_file_contents", {
+                await call_github_mcp("create_or_update_file", {
                     "owner": state.repo_owner,
                     "repo": state.repo_name,
                     "path": "review-artifacts/memory/pattern-history.json",
                     "content": payload_str,
                     "message": "chore: update mined pattern history [skip ci]",
+                    "branch": state.pr_branch,
                     "sha": sha
                 })
             except Exception as e:

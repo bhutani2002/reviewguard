@@ -25,7 +25,12 @@ async def audit_log_node(state: AgentState) -> AgentState:
     # 1. Generate Spec Compliance Table
     spec_results_table = ""
     for r in state.spec_results:
-        spec_results_table += f"| {r['criterion']} | {r['status']} | {r['confidence']} | {r['evidence']} |\n"
+        raw_ev = r.get("evidence", "")
+        # Clean newlines, pipes and quotes to prevent breaking markdown tables
+        clean_ev = raw_ev.strip().replace("\n", " ").replace("|", "/").replace('"', "'").replace('`', "'")
+        if len(clean_ev) > 100:
+            clean_ev = clean_ev[:97] + "..."
+        spec_results_table += f"| {r['criterion']} | {r['status']} | {r['confidence']} | {clean_ev} |\n"
         
     # 2. Generate findings lists
     auto_post_list = ""
