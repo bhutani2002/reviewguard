@@ -8,6 +8,26 @@ from agent.mock_utils import MOCK_MODE, load_mock_fixture
 async def spec_reader_node(state: AgentState) -> AgentState:
     """SpecReaderNode to retrieve acceptance criteria from linked issue."""
     import re
+    # 1. Fetch PR files and construct diff in live mode if not already set
+    if not MOCK_MODE and not state.pr_diff:
+        print(f"Fetching PR files for PR #{state.pr_number} via GitHub MCP...")
+        try:
+            files_data = await call_github_mcp("get_pull_request_files", {
+                "owner": state.repo_owner,
+                "repo": state.repo_name,
+                "pull_number": state.pr_number
+            })
+            files_list = files_data if isinstance(files_data, list) else files_data.get("files", [])
+            diff_parts = []
+            for f in files_list:
+                filename = f.get("filename", "")
+                patch = f.get("patch", "")
+                diff_parts.append(f"--- a/{filename}\n+++ b/{filename}\n{patch}")
+            state.pr_diff = "\n".join(diff_parts)
+            print(f"Successfully constructed PR diff from MCP files list, length: {len(state.pr_diff)} characters.")
+        except Exception as e:
+            print(f"Error fetching PR files via MCP: {e}")
+
     if not state.linked_issue_number:
         match = re.search(r"(?:fixes|closes|resolves|issue)\s*#?(\d+)", (state.pr_body or "") + " " + (state.pr_title or ""), re.IGNORECASE)
         if match:

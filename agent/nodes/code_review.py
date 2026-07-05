@@ -50,6 +50,32 @@ def parse_changed_files(pr_diff: str) -> list:
             files.append(line[6:])
     return files
 
+def extract_file_content(file_data) -> str:
+    """Safely extract and decode content from call_github_mcp get_file_contents response."""
+    if not file_data:
+        return ""
+    if isinstance(file_data, str):
+        return file_data
+    if isinstance(file_data, dict):
+        if "content" in file_data:
+            content_b64 = file_data.get("content", "")
+            try:
+                clean_b64 = "".join(content_b64.split())
+                missing_padding = len(clean_b64) % 4
+                if missing_padding:
+                    clean_b64 += "=" * (4 - missing_padding)
+                return base64.b64decode(clean_b64).decode("utf-8")
+            except Exception:
+                pass
+        if "text" in file_data:
+            return file_data.get("text", "")
+        # Fallback: if it's already a parsed JSON dictionary, serialize it back to string
+        try:
+            return json.dumps(file_data)
+        except Exception:
+            pass
+    return ""
+
 @node
 async def code_review_node(state: AgentState) -> AgentState:
     """CodeReviewNode to check code quality and memory cross-references."""
@@ -67,9 +93,8 @@ async def code_review_node(state: AgentState) -> AgentState:
                     "repo": state.repo_name,
                     "path": filepath
                 })
-                content_b64 = file_data.get("content", "")
-                if content_b64:
-                    content_str = base64.b64decode(content_b64).decode("utf-8")
+                content_str = extract_file_content(file_data)
+                if content_str:
                     file_contents[filepath] = content_str
             except Exception as e:
                 print(f"Warning: Could not fetch {filepath} contents: {e}")

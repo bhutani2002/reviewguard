@@ -25,6 +25,32 @@ def parse_changed_files(pr_diff: str) -> list:
             files.append(line[6:])
     return files
 
+def extract_file_content(file_data) -> str:
+    """Safely extract and decode content from call_github_mcp get_file_contents response."""
+    if not file_data:
+        return ""
+    if isinstance(file_data, str):
+        return file_data
+    if isinstance(file_data, dict):
+        if "content" in file_data:
+            content_b64 = file_data.get("content", "")
+            try:
+                clean_b64 = "".join(content_b64.split())
+                missing_padding = len(clean_b64) % 4
+                if missing_padding:
+                    clean_b64 += "=" * (4 - missing_padding)
+                return base64.b64decode(clean_b64).decode("utf-8")
+            except Exception:
+                pass
+        if "text" in file_data:
+            return file_data.get("text", "")
+        # Fallback: if it's already a parsed JSON dictionary, serialize it back to string
+        try:
+            return json.dumps(file_data)
+        except Exception:
+            pass
+    return ""
+
 @node
 async def memory_loader_node(state: AgentState) -> AgentState:
     """MemoryLoaderNode loads bootstrap decisions and mines closed PR comments."""
@@ -39,14 +65,8 @@ async def memory_loader_node(state: AgentState) -> AgentState:
                 "repo": state.repo_name,
                 "path": "review-artifacts/memory/team-decisions.json"
             })
-            content_b64 = file_data.get("content", "")
-            if content_b64:
-                # Strip all whitespaces and fix base64 padding
-                content_b64 = "".join(content_b64.split())
-                missing_padding = len(content_b64) % 4
-                if missing_padding:
-                    content_b64 += "=" * (4 - missing_padding)
-                content_str = base64.b64decode(content_b64).decode("utf-8")
+            content_str = extract_file_content(file_data)
+            if content_str:
                 decisions_data = json.loads(content_str)
                 state.team_decisions = decisions_data.get("decisions", [])
             else:
@@ -105,15 +125,9 @@ async def memory_loader_node(state: AgentState) -> AgentState:
                 "repo": state.repo_name,
                 "path": "review-artifacts/memory/pattern-history.json"
             })
-            content_b64 = history_data.get("content", "")
-            sha = history_data.get("sha")
-            if content_b64:
-                # Strip all whitespaces and fix base64 padding
-                content_b64 = "".join(content_b64.split())
-                missing_padding = len(content_b64) % 4
-                if missing_padding:
-                    content_b64 += "=" * (4 - missing_padding)
-                content_str = base64.b64decode(content_b64).decode("utf-8")
+            content_str = extract_file_content(history_data)
+            sha = history_data.get("sha") if isinstance(history_data, dict) else None
+            if content_str:
                 history_json = json.loads(content_str)
                 pattern_history = history_json.get("mined_patterns", [])
         except Exception as e:
