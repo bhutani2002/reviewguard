@@ -14,12 +14,19 @@ async def github_comment_node(state: AgentState) -> AgentState:
     for r in state.spec_results:
         status = r.get("status")
         criterion = r.get("criterion")
-        evidence = r.get("evidence", "")
+        raw_evidence = r.get("evidence", "")
+        
+        # Clean evidence to a single line, strip quotes/backticks to prevent markdown formatting breakage
+        evidence = raw_evidence.strip().replace("\n", " ").replace('"', "'").replace('`', "'")
+        if len(evidence) > 120:
+            evidence = evidence[:117] + "..."
+            
+        evidence_str = f" — *\"{evidence}\"*" if evidence and evidence.lower() != "none" else ""
         
         if status == "SATISFIED":
-            spec_summary += f"✅ **SATISFIED (HIGH)** — {criterion} — *\"{evidence}\"*\n"
+            spec_summary += f"✅ **SATISFIED (HIGH)** — {criterion}{evidence_str}\n"
         elif status == "PARTIAL":
-            spec_summary += f"⚠️ **PARTIAL (HIGH)** — {criterion} — *\"{evidence}\"* — **MERGE BLOCKER**\n"
+            spec_summary += f"⚠️ **PARTIAL (HIGH)** — {criterion}{evidence_str} — **MERGE BLOCKER**\n"
         elif status == "MISSING":
             spec_summary += f"❌ **MISSING (HIGH)** — {criterion} — **MERGE BLOCKER**\n"
 

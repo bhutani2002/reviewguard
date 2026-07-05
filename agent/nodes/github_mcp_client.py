@@ -215,7 +215,7 @@ async def call_github_mcp(tool_name: str, arguments: dict) -> dict:
                 encoded = base64.b64encode(b'{"learnings": []}').decode("utf-8")
                 return {"content": encoded, "encoding": "base64"}
                 
-        elif tool_name == "create_or_update_file_contents":
+        elif tool_name == "create_or_update_file":
             path = arguments.get("path")
             content = arguments.get("content")
             print(f"[MOCK MCP] Committed file to {path}. Content length: {len(content)}")

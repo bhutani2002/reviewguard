@@ -179,7 +179,7 @@ _Full confidence scores and raw LLM reasoning available in agent trace logs_
             if sha:
                 params["sha"] = sha
 
-            await call_github_mcp("create_or_update_file_contents", params)
+            await call_github_mcp("create_or_update_file", params)
         except Exception as e:
             print(f"Error committing audit log file: {e}")
 

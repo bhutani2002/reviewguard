@@ -87,6 +87,9 @@ async def code_review_node(state: AgentState) -> AgentState:
         state.complexity_report = load_mock_fixture("complexity_report")
     else:
         for filepath in changed_files:
+            # Skip workflow files and non-Python source files to avoid noise
+            if filepath.startswith(".github/") or not filepath.endswith(".py"):
+                continue
             try:
                 file_data = await call_github_mcp("get_file_contents", {
                     "owner": state.repo_owner,
