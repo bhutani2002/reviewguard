@@ -158,7 +158,8 @@ _Full confidence scores and raw LLM reasoning available in agent trace logs_
                 "repo": state.repo_name,
                 "path": state.audit_file_path,
                 "content": audit_markdown,
-                "message": f"chore: ReviewGuard audit for PR #{state.pr_number} [skip ci]"
+                "message": f"chore: ReviewGuard audit for PR #{state.pr_number} [skip ci]",
+                "branch": state.pr_branch
             })
         except Exception as e:
             print(f"Error committing audit log file: {e}")

@@ -91,7 +91,8 @@ async def code_review_node(state: AgentState) -> AgentState:
                 file_data = await call_github_mcp("get_file_contents", {
                     "owner": state.repo_owner,
                     "repo": state.repo_name,
-                    "path": filepath
+                    "path": filepath,
+                    "ref": state.pr_branch
                 })
                 content_str = extract_file_content(file_data)
                 if content_str:

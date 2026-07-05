@@ -114,6 +114,18 @@ async def github_comment_node(state: AgentState) -> AgentState:
             if isinstance(res, dict) and "id" in res:
                 state.pr_review_id = str(res["id"])
         except Exception as e:
-            print(f"Error posting pull request review: {e}")
+            print(f"Warning: Failed to post review with inline comments: {e}. Falling back to summary-only review.")
+            try:
+                res = await call_github_mcp("create_pull_request_review", {
+                    "owner": state.repo_owner,
+                    "repo": state.repo_name,
+                    "pull_number": state.pr_number,
+                    "event": event_type,
+                    "body": pr_comment_body
+                })
+                if isinstance(res, dict) and "id" in res:
+                    state.pr_review_id = str(res["id"])
+            except Exception as ex:
+                print(f"Error posting pull request review summary fallback: {ex}")
 
     return state

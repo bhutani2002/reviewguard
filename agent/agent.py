@@ -164,6 +164,7 @@ if __name__ == "__main__":
         pr_body = os.environ.get("PR_BODY", "")
         repo_owner = os.environ["REPO_OWNER"]
         repo_name = os.environ["REPO_NAME"]
+        pr_branch = os.environ.get("PR_BRANCH", "main")
 
     state = AgentState(
         pr_number=pr_num,
@@ -173,6 +174,7 @@ if __name__ == "__main__":
         linked_issue_number=None,   # parsed from pr_body by SpecReaderNode
         repo_owner=repo_owner,
         repo_name=repo_name,
+        pr_branch=pr_branch if not MOCK_MODE else "main",
         run_id=str(uuid.uuid4())
     )
 

@@ -11,6 +11,7 @@ class AgentState:
     linked_issue_number: Optional[int]
     repo_owner: str
     repo_name: str
+    pr_branch: str = "main"
 
     # Populated by SecurityScreenNode
     security_passed: bool = False
