@@ -1,0 +1,197 @@
+import os
+import re
+from datetime import datetime
+from google.adk.workflow import node
+from agent.state import AgentState
+from agent.nodes.github_mcp_client import call_github_mcp
+from agent.mock_utils import MOCK_MODE
+
+def clean_slug(title: str) -> str:
+    """Generate a clean URL slug from the PR title."""
+    slug = title.lower()
+    slug = re.sub(r'[^a-z0-9\s-]', '', slug)
+    slug = re.sub(r'[\s-]+', '-', slug)
+    return slug.strip('-')[:40]
+
+@node
+async def audit_log_node(state: AgentState) -> AgentState:
+    """AuditLogNode writes the audit log markdown and creates the HITL issue if needed."""
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    slug = clean_slug(state.pr_title)
+    
+    # Path format: review-artifacts/YYYY-MM-DD/pr-{number}-{slug}.md
+    state.audit_file_path = f"review-artifacts/{date_str}/pr-{state.pr_number}-{slug}.md"
+    
+    # 1. Generate Spec Compliance Table
+    spec_results_table = ""
+    for r in state.spec_results:
+        spec_results_table += f"| {r['criterion']} | {r['status']} | {r['confidence']} | {r['evidence']} |\n"
+        
+    # 2. Generate findings lists
+    auto_post_list = ""
+    for f in state.auto_post_findings:
+        text = f.get("finding") or f.get("criterion", "")
+        file_info = f"{f.get('file')}:{f.get('line')}" if f.get('line') else (f.get('file') or f.get('line_ref') or 'General')
+        category = f.get("category", "compliance" if "criterion" in f else "review")
+        auto_post_list += f"- **[{category.upper()}]** {file_info}: {text} (Confidence: {f.get('confidence', 'LOW')})\n"
+        
+    hitl_list = ""
+    for f in state.hitl_escalations:
+        text = f.get("finding") or f.get("criterion", "")
+        file_info = f"{f.get('file')}:{f.get('line')}" if f.get('line') else (f.get('file') or f.get('line_ref') or 'General')
+        category = f.get("category", "compliance" if "criterion" in f else "review")
+        hitl_list += f"- **[{category.upper()}]** {file_info}: {text}\n"
+        
+    suppressed_list = ""
+    # Look for suppressed findings in state.review_findings
+    suppressed_findings = [f for f in state.review_findings if f.get("suppressed_by_memory")]
+    for f in suppressed_findings:
+        text = f.get("finding") or f.get("criterion", "")
+        suppressed_list += f"- **[{f.get('category', 'review').upper()}]** {text} (Suppressed by decision: {f.get('memory_reference')})\n"
+        
+    # 3. Memory summary
+    team_decisions_applied = ""
+    for td in state.team_decisions:
+        team_decisions_applied += f"- **{td.get('id', 'TD')} ({td.get('topic')})**: {td.get('description')}\n"
+        
+    pr_thread_learnings_used = ""
+    for l in state.pr_thread_learnings:
+        pr_thread_learnings_used += f"- Mined decision on `{l.get('topic')}` from closed PR #{l.get('first_seen_pr')}\n"
+        
+    stale_decisions_flagged = ""
+    for s in state.stale_decisions:
+        stale_decisions_flagged += f"- **{s.get('id', 'TD')} ({s.get('topic')})**: Decided on {s.get('date')} (Over 366 days old)\n"
+        
+    # 4. Security findings
+    security_status = "PASSED" if state.security_passed else "BLOCKED"
+    security_findings_str = ""
+    for sf in state.security_findings:
+        security_findings_str += f"- **[{sf['severity']}]** {sf['type']}: {sf['message']}\n"
+
+    # Compile the final audit markdown
+    audit_markdown = f"""# ReviewGuard Audit — PR #{state.pr_number}: {state.pr_title}
+
+**Date:** {date_str}
+**Repo:** {state.repo_owner}/{state.repo_name}
+**Linked Issue:** #{state.linked_issue_number if state.linked_issue_number else "None"}
+**Triggered by:** GitHub Actions
+
+---
+
+## Spec Compliance Results
+
+| Criterion | Status | Confidence | Evidence |
+| --------- | ------ | ---------- | -------- |
+{spec_results_table}
+
+**Merge Blockers:** {len(state.merge_blockers)} found
+{chr(10).join([f"- **[BLOCKER]** {b.get('criterion', b.get('finding'))}" for b in state.merge_blockers])}
+
+---
+
+## Code Review Findings
+
+### Auto-posted to PR ({len(state.auto_post_findings)} findings)
+
+{auto_post_list if auto_post_list else "_No findings auto-posted._"}
+
+### Escalated for Human Review ({len(state.hitl_escalations)} findings)
+
+{hitl_list if hitl_list else "_No findings escalated._"}
+
+### Suppressed by Team Memory ({len(suppressed_findings)} findings)
+
+{suppressed_list if suppressed_list else "_No findings suppressed by memory._"}
+
+---
+
+## Memory Consulted
+
+### Team Decisions Applied
+
+{team_decisions_applied if team_decisions_applied else "_No team decisions applied._"}
+
+### PR Thread Learnings Used
+
+{pr_thread_learnings_used if pr_thread_learnings_used else "_No PR learnings used._"}
+
+### Stale Decisions Flagged
+
+{stale_decisions_flagged if stale_decisions_flagged else "_No stale decisions flagged._"}
+
+---
+
+## Security Screen Results
+
+Status: {security_status}
+{security_findings_str if security_findings_str else "_No security issues detected._"}
+
+---
+
+_Generated by ReviewGuard v1.0 | ADK 2.0 multi-agent graph_
+_Full confidence scores and raw LLM reasoning available in agent trace logs_
+"""
+
+    state.audit_markdown = audit_markdown
+    state.audit_file_url = f"https://github.com/{state.repo_owner}/{state.repo_name}/blob/main/{state.audit_file_path}"
+
+    # Commit the audit file to the repo using GitHub MCP
+    print(f"Committing audit log to repository path: {state.audit_file_path}...")
+    if MOCK_MODE:
+        print(f"[MOCK MCP] Committed file to {state.audit_file_path}. Content length: {len(audit_markdown)}")
+        # Write to sibling demo-paymentservice directory for local validation
+        try:
+            import os
+            local_base = os.path.abspath(os.path.join(os.getcwd(), "..", "demo-paymentservice"))
+            if os.path.exists(local_base):
+                local_path = os.path.join(local_base, state.audit_file_path)
+                os.makedirs(os.path.dirname(local_path), exist_ok=True)
+                with open(local_path, "w", encoding="utf-8") as lf:
+                    lf.write(audit_markdown)
+                print(f"[MOCK LOCAL WRITE] Wrote validation audit log to: {local_path}")
+        except Exception as e:
+            print(f"Failed to write local mock audit log: {e}")
+    else:
+        try:
+            await call_github_mcp("create_or_update_file_contents", {
+                "owner": state.repo_owner,
+                "repo": state.repo_name,
+                "path": state.audit_file_path,
+                "content": audit_markdown,
+                "message": f"chore: ReviewGuard audit for PR #{state.pr_number} [skip ci]"
+            })
+        except Exception as e:
+            print(f"Error committing audit log file: {e}")
+
+    # Create HITL Issue if there are low-confidence findings
+    if state.hitl_escalations:
+        hitl_title = f"[ReviewGuard HITL] PR #{state.pr_number} — {len(state.hitl_escalations)} low-confidence findings need human review"
+        
+        hitl_body = f"The ReviewGuard agent has escalated the following low-confidence findings for PR #{state.pr_number} ({state.pr_title}):\n\n"
+        for idx, f in enumerate(state.hitl_escalations, 1):
+            file_info = f"{f.get('file')}:{f.get('line')}" if f.get('line') else (f.get('file') or f.get('line_ref') or 'General')
+            text = f.get("finding") or f.get("criterion", "")
+            hitl_body += f"### {idx}. [{f.get('category', 'review').upper()}] in {file_info}\n"
+            hitl_body += f"- **Finding:** {text}\n"
+            hitl_body += f"- **Reasoning:** {f.get('reasoning', '')}\n\n"
+            
+        print("Creating HITL Escalation Issue...")
+        if MOCK_MODE:
+            print(f"[MOCK MCP] Created HITL issue titled '{hitl_title}'")
+            state.hitl_issue_number = 101
+            state.audit_markdown += f"\n*HITL Escalated to Issue #101*"
+        else:
+            try:
+                issue_res = await call_github_mcp("create_issue", {
+                    "owner": state.repo_owner,
+                    "repo": state.repo_name,
+                    "title": hitl_title,
+                    "body": hitl_body
+                })
+                issue_num = issue_res.get('number') if isinstance(issue_res, dict) else 101
+                state.hitl_issue_number = issue_num
+                state.audit_markdown += f"\n*HITL Escalated to Issue #{issue_num}*"
+            except Exception as e:
+                print(f"Error creating HITL issue: {e}")
+
+    return state

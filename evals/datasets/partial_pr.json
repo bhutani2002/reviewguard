@@ -1,0 +1,72 @@
+{
+  "scenario_id": "partial_pr_001",
+  "description": "The demo PR. Hardcoded TTL (TD-001/TD-006), hardcoded max_attempts=5 (TD-002), missing 64-char key validation (criterion 3), missing expired-key test (criterion 6).",
+  "input": {
+    "pr_number": 17,
+    "pr_title": "feat: Add idempotency key support — Fixes #15",
+    "pr_body": "Implements idempotency key support. Fixes #15",
+    "linked_issue_number": 15,
+    "repo_owner": "YOUR_GITHUB_USERNAME",
+    "repo_name": "demo-paymentservice"
+  },
+  "expected_outcome": "merge_blocker_found",
+  "expected_merge_blockers": 2,
+  "expected_security": "passed",
+  "auto_hitl_decision": null,
+  "mock_fixtures": {
+    "pr_diff": "--- a/src/payment_processor.py\n+++ b/src/payment_processor.py\n@@ +18 @@\n+        self._idempotency_ttl = 86400\n@@ +45 @@\n+        max_attempts = 5\n@@ +31 @@\n+        if not key:\n+            raise IdempotencyException(error_code='INVALID_KEY', user_message='Key must not be empty.')",
+    "issue_body": "## Acceptance Criteria\n1. Every payment request must accept an `idempotency_key` string parameter\n2. Duplicate requests with same key within TTL window must return cached response\n3. `idempotency_key` must be validated — non-empty string, maximum 64 characters\n4. Cache TTL must be configurable via Config (not hardcoded)\n5. If no key provided, generate UUID automatically\n6. Unit tests must cover: duplicate key returns same result, key over 64 chars rejected, expired key allows re-processing",
+    "team_decisions": [
+      {
+        "id": "TD-001",
+        "topic": "hardcoded_config_values",
+        "decision": "rejected",
+        "severity": "merge_blocker",
+        "description": "All configurable values must come from config.py. Hardcoded values are a merge blocker.",
+        "keywords": ["hardcoded", "86400", "magic number"]
+      },
+      {
+        "id": "TD-002",
+        "topic": "retry_max_attempts",
+        "decision": "standardized",
+        "severity": "merge_blocker",
+        "description": "Maximum retry attempts is 3 via Config.RETRY_MAX_ATTEMPTS. Any other value is a merge blocker.",
+        "keywords": ["max_attempts", "retry_count", "5"]
+      },
+      {
+        "id": "TD-006",
+        "topic": "idempotency_cache_ttl",
+        "decision": "standardized",
+        "severity": "merge_blocker",
+        "description": "Idempotency cache TTL must come from Config.IDEMPOTENCY_CACHE_TTL_SECONDS. Never hardcode 86400.",
+        "keywords": ["idempotency", "ttl", "86400", "cache_ttl"]
+      }
+    ],
+    "closed_pr_comments": [
+      {
+        "pr_number": 1,
+        "comments": [
+          "Hardcoded timeout = 30 here will cause issues in staging. Move to Config.",
+          "Fixed — all values now in Config class.",
+          "Approving. Team rule — no hardcoded values in src/. Adding as TD-001."
+        ]
+      },
+      {
+        "pr_number": 3,
+        "comments": [
+          "Why 3 attempts? Other services use 5.",
+          "Load testing showed 5 caused thundering herd. 3 with backoff is correct.",
+          "Makes sense. Documenting as TD-002."
+        ]
+      }
+    ],
+    "complexity_report": {
+      "src/payment_processor.py": {
+        "cyclomatic": 8,
+        "max_nesting": 3,
+        "avg_function_length": 22,
+        "total_lines": 95
+      }
+    }
+  }
+}

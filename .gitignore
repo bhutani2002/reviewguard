@@ -1,0 +1,15 @@
+# Excluded artifacts and logs
+artifacts/traces/*.json
+artifacts/logs/*.log
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+env/
+review-artifacts/
+
+# Diagnostics
+artifacts/logs/reviewguard_diag_*.log
+artifacts/logs/reviewguard_error_*.log

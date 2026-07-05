@@ -1,0 +1,30 @@
+{
+  "scenario_id": "good_pr_001",
+  "description": "Clean PR. Fully satisfies all criteria. No memory violations. No security issues.",
+  "input": {
+    "pr_number": 20,
+    "pr_title": "feat: Add structured request logging",
+    "pr_body": "Adds structured logging to all payment requests. Fixes #16",
+    "linked_issue_number": 16,
+    "repo_owner": "YOUR_GITHUB_USERNAME",
+    "repo_name": "demo-paymentservice"
+  },
+  "expected_outcome": "no_blockers",
+  "expected_merge_blockers": 0,
+  "expected_security": "passed",
+  "auto_hitl_decision": null,
+  "mock_fixtures": {
+    "pr_diff": "--- a/src/payment_processor.py\n+++ b/src/payment_processor.py\n@@ -12 +12 @@\n+        logger.info('Processing payment', extra={'merchant_id': request.merchant_id, 'amount_cents': request.amount_cents})\n+        logger.error('Payment failed', extra={'error_code': exc.error_code})",
+    "issue_body": "## Acceptance Criteria\n1. Log payment_id and merchant_id on every request at INFO level\n2. Log ERROR level on payment failure with error_code\n3. Sensitive fields (card numbers, CVV) must never appear in logs",
+    "team_decisions": [],
+    "closed_pr_comments": [],
+    "complexity_report": {
+      "src/payment_processor.py": {
+        "cyclomatic": 5,
+        "max_nesting": 2,
+        "avg_function_length": 15,
+        "total_lines": 40
+      }
+    }
+  }
+}
