@@ -53,7 +53,8 @@ async def github_comment_node(state: AgentState) -> AgentState:
         
         # Also list in the main PR comment summary
         file_info = f"{filepath}:{line_num}" if line_num else filepath
-        code_review_summary += f"- **[{f.get('category', 'review')}]** `{file_info}`: {finding}\n"
+        category = f.get("category", "review").upper()
+        code_review_summary += f"- **[{category}]** `{file_info}`: {finding}\n"
 
     if not code_review_summary:
         code_review_summary = "_No code review issues auto-posted._\n"

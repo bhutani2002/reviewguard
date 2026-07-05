@@ -163,6 +163,8 @@ Return a JSON array of findings. Each finding:
 }}
 
 Rules:
+- Do NOT review, flag, or report findings in any files inside the '.github/' folder (such as workflow YAML files) or any non-source files. Only review actual Python source code files.
+- Do NOT flag missing imports, missing implementations, or class definitions that are not shown in the diff. Assume they exist elsewhere in the repository and are imported correctly.
 - Do NOT flag anything covered by team_decisions_summary (they are suppressed/already decided).
 - If a finding relates to a potentially stale decision, include it with confidence MEDIUM and note the stale decision in memory_reference.
 - Be specific. Reference actual lines, variable names, function names from the diff.
@@ -184,8 +186,12 @@ Rules:
         for finding in findings:
             if not isinstance(finding, dict):
                 continue
+            finding_file = finding.get("file", "") or ""
+            # Strictly ignore any findings related to workflow configuration files or non-Python files
+            if finding_file.startswith(".github/") or (finding_file and not finding_file.endswith(".py")):
+                continue
+                
             finding_text = finding.get("finding", "").lower()
-            finding_file = finding.get("file", "")
             
             for decision in state.team_decisions:
                 decision_topic = decision.get("topic", "").replace("_", " ").lower()
