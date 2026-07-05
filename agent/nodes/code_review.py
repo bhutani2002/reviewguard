@@ -92,7 +92,7 @@ async def code_review_node(state: AgentState) -> AgentState:
                     "owner": state.repo_owner,
                     "repo": state.repo_name,
                     "path": filepath,
-                    "ref": state.pr_branch
+                    "branch": state.pr_branch
                 })
                 content_str = extract_file_content(file_data)
                 if content_str:

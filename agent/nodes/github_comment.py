@@ -28,6 +28,10 @@ async def github_comment_node(state: AgentState) -> AgentState:
     inline_comments = []
     
     for f in state.auto_post_findings:
+        # Only process code review findings, not spec compliance results
+        if "finding" not in f:
+            continue
+            
         filepath = f.get("file")
         line_num = f.get("line")
         finding = f.get("finding")
@@ -86,8 +90,8 @@ async def github_comment_node(state: AgentState) -> AgentState:
 ### ⚠️ HITL Escalations
 {hitl_summary}
 
-### 📄 Full Audit Log
-[`{audit_link}`](https://github.com/{state.repo_owner}/{state.repo_name}/blob/main/{audit_link})
+### 📄 Full Audit
+[`{audit_link}`](https://github.com/{state.repo_owner}/{state.repo_name}/blob/{state.pr_branch}/{audit_link})
 
 ---
 *ReviewGuard v1.0 | Confidence-aware | Memory-backed | ADK 2.0*
