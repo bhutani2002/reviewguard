@@ -7,6 +7,13 @@ from agent.mock_utils import MOCK_MODE, load_mock_fixture
 @node
 async def spec_reader_node(state: AgentState) -> AgentState:
     """SpecReaderNode to retrieve acceptance criteria from linked issue."""
+    import re
+    if not state.linked_issue_number:
+        match = re.search(r"(?:fixes|closes|resolves|issue)\s*#?(\d+)", (state.pr_body or "") + " " + (state.pr_title or ""), re.IGNORECASE)
+        if match:
+            state.linked_issue_number = int(match.group(1))
+            print(f"Parsed linked issue #{state.linked_issue_number} from PR title/body.")
+
     if not state.linked_issue_number and not MOCK_MODE:
         print("No linked issue found for this PR.")
         state.acceptance_criteria = []

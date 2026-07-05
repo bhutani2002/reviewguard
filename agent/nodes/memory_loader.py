@@ -41,6 +41,11 @@ async def memory_loader_node(state: AgentState) -> AgentState:
             })
             content_b64 = file_data.get("content", "")
             if content_b64:
+                # Strip all whitespaces and fix base64 padding
+                content_b64 = "".join(content_b64.split())
+                missing_padding = len(content_b64) % 4
+                if missing_padding:
+                    content_b64 += "=" * (4 - missing_padding)
                 content_str = base64.b64decode(content_b64).decode("utf-8")
                 decisions_data = json.loads(content_str)
                 state.team_decisions = decisions_data.get("decisions", [])
@@ -63,7 +68,8 @@ async def memory_loader_node(state: AgentState) -> AgentState:
                 "state": "closed",
                 "per_page": 20
             })
-            prs_list = prs_data.get("pull_requests", [])
+            # The tool can return a list directly or a dict
+            prs_list = prs_data if isinstance(prs_data, list) else prs_data.get("pull_requests", [])
             
             for pr in prs_list:
                 pr_num = pr.get("number")
@@ -72,7 +78,7 @@ async def memory_loader_node(state: AgentState) -> AgentState:
                     "repo": state.repo_name,
                     "pull_number": pr_num
                 })
-                comments = comments_data.get("comments", [])
+                comments = comments_data if isinstance(comments_data, list) else comments_data.get("comments", [])
                 prs_with_comments.append({
                     "number": pr_num,
                     "title": pr.get("title", ""),
@@ -102,6 +108,11 @@ async def memory_loader_node(state: AgentState) -> AgentState:
             content_b64 = history_data.get("content", "")
             sha = history_data.get("sha")
             if content_b64:
+                # Strip all whitespaces and fix base64 padding
+                content_b64 = "".join(content_b64.split())
+                missing_padding = len(content_b64) % 4
+                if missing_padding:
+                    content_b64 += "=" * (4 - missing_padding)
                 content_str = base64.b64decode(content_b64).decode("utf-8")
                 history_json = json.loads(content_str)
                 pattern_history = history_json.get("mined_patterns", [])
