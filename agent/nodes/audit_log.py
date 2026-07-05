@@ -133,7 +133,7 @@ _Full confidence scores and raw LLM reasoning available in agent trace logs_
 """
 
     state.audit_markdown = audit_markdown
-    state.audit_file_url = f"https://github.com/{state.repo_owner}/{state.repo_name}/blob/main/{state.audit_file_path}"
+    state.audit_file_url = f"https://github.com/{state.repo_owner}/{state.repo_name}/blob/{state.pr_branch}/{state.audit_file_path}"
 
     # Commit the audit file to the repo using GitHub MCP
     print(f"Committing audit log to repository path: {state.audit_file_path}...")
@@ -153,14 +153,33 @@ _Full confidence scores and raw LLM reasoning available in agent trace logs_
             print(f"Failed to write local mock audit log: {e}")
     else:
         try:
-            await call_github_mcp("create_or_update_file_contents", {
+            # First fetch the file SHA if it already exists to avoid 409 Conflict
+            sha = None
+            try:
+                existing_file = await call_github_mcp("get_file_contents", {
+                    "owner": state.repo_owner,
+                    "repo": state.repo_name,
+                    "path": state.audit_file_path,
+                    "branch": state.pr_branch
+                })
+                if isinstance(existing_file, dict) and "sha" in existing_file:
+                    sha = existing_file["sha"]
+            except Exception:
+                # File does not exist yet, which is fine
+                pass
+
+            params = {
                 "owner": state.repo_owner,
                 "repo": state.repo_name,
                 "path": state.audit_file_path,
                 "content": audit_markdown,
                 "message": f"chore: ReviewGuard audit for PR #{state.pr_number} [skip ci]",
                 "branch": state.pr_branch
-            })
+            }
+            if sha:
+                params["sha"] = sha
+
+            await call_github_mcp("create_or_update_file_contents", params)
         except Exception as e:
             print(f"Error committing audit log file: {e}")
 

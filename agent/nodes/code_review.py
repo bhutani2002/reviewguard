@@ -170,8 +170,17 @@ Rules:
         response_text = await generate_text(prompt, role="final", response_mime_type="application/json")
         findings = json.loads(response_text)
         
+        if not isinstance(findings, list):
+            if isinstance(findings, dict):
+                findings = findings.get("findings", findings.get("issues", [findings]))
+            else:
+                findings = []
+        
         # 3. Cross-reference findings with team decisions to double check suppressions
+        clean_findings = []
         for finding in findings:
+            if not isinstance(finding, dict):
+                continue
             finding_text = finding.get("finding", "").lower()
             finding_file = finding.get("file", "")
             
@@ -189,7 +198,8 @@ Rules:
                         finding["suppressed_by_memory"] = True
                         finding["memory_reference"] = decision.get("id")
                         break
-        state.review_findings = findings
+            clean_findings.append(finding)
+        state.review_findings = clean_findings
     except Exception as e:
         print(f"Error calling LLM in code_review_node: {e}")
         state.review_findings = MOCK_REVIEW_FINDINGS

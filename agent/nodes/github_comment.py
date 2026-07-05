@@ -55,7 +55,15 @@ async def github_comment_node(state: AgentState) -> AgentState:
     memory_summary = ""
     suppressed_findings = [f for f in state.review_findings if f.get("suppressed_by_memory")]
     for sf in suppressed_findings:
-        memory_summary += f"- Suppressed style warning about `{sf.get('category')}` based on team decision **{sf.get('memory_reference')}**\n"
+        decision_id = sf.get("memory_reference")
+        # Find matching decision in state.team_decisions
+        decision = next((d for d in state.team_decisions if d.get("id") == decision_id), None)
+        if decision:
+            desc = decision.get("description", "")
+            topic = decision.get("topic", "")
+            memory_summary += f"- **Suppressed finding** about `{topic}` based on team decision **{decision_id}**: *{desc}*\n"
+        else:
+            memory_summary += f"- **Suppressed finding** based on team decision **{decision_id}**\n"
         
     for sd in state.stale_decisions:
         memory_summary += f"- ⚠️ **Flagged Stale Decision {sd.get('id')}**: Decided on {sd.get('date')} (over 366 days old). Please verify if still valid.\n"

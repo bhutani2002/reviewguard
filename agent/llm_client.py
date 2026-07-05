@@ -8,18 +8,18 @@ from google.genai import types
 INTERMEDIATE_PROVIDERS = [
     {"type": "gemini", "model": "gemini-2.5-flash"},
     {"type": "groq", "model": "llama-3.3-70b-versatile", "url": "https://api.groq.com/openai/v1/chat/completions"},
-    {"type": "groq", "model": "llama3-8b-8192", "url": "https://api.groq.com/openai/v1/chat/completions"},
-    {"type": "openrouter", "model": "meta-llama/llama-3.2-3b-instruct:free", "url": "https://openrouter.ai/api/v1/chat/completions"},
-    {"type": "openrouter", "model": "nvidia/nemotron-nano-9b-v2:free", "url": "https://openrouter.ai/api/v1/chat/completions"},
-    {"type": "openrouter", "model": "google/gemma-2-9b-it:free", "url": "https://openrouter.ai/api/v1/chat/completions"}
+    {"type": "groq", "model": "gemma2-9b-it", "url": "https://api.groq.com/openai/v1/chat/completions"},
+    {"type": "openrouter", "model": "google/gemini-2.5-flash:free", "url": "https://openrouter.ai/api/v1/chat/completions"},
+    {"type": "openrouter", "model": "meta-llama/llama-3.3-70b-instruct:free", "url": "https://openrouter.ai/api/v1/chat/completions"},
 ]
 
 FINAL_PROVIDERS = [
     {"type": "gemini", "model": "gemini-2.5-flash"},
     {"type": "groq", "model": "llama-3.3-70b-versatile", "url": "https://api.groq.com/openai/v1/chat/completions"},
+    {"type": "groq", "model": "mixtral-8x7b-32768", "url": "https://api.groq.com/openai/v1/chat/completions"},
+    {"type": "openrouter", "model": "google/gemini-2.5-pro:free", "url": "https://openrouter.ai/api/v1/chat/completions"},
+    {"type": "openrouter", "model": "google/gemini-2.5-flash:free", "url": "https://openrouter.ai/api/v1/chat/completions"},
     {"type": "openrouter", "model": "meta-llama/llama-3.3-70b-instruct:free", "url": "https://openrouter.ai/api/v1/chat/completions"},
-    {"type": "openrouter", "model": "nvidia/nemotron-3-ultra-550b-a55b:free", "url": "https://openrouter.ai/api/v1/chat/completions"},
-    {"type": "openrouter", "model": "google/gemini-2.5-flash", "url": "https://openrouter.ai/api/v1/chat/completions"}
 ]
 
 async def call_gemini(model: str, prompt: str, system_instruction: str = None, response_mime_type: str = "text/plain") -> str:

@@ -1,5 +1,6 @@
 import os
 import json
+import asyncio
 from google.adk.workflow import node
 from agent.state import AgentState
 from agent.llm_client import generate_text
@@ -105,7 +106,11 @@ async def spec_compliance_node(state: AgentState) -> AgentState:
     print("Running spec compliance analysis with fallback LLMs...")
     spec_results = []
     
-    for criterion in state.acceptance_criteria:
+    for idx, criterion in enumerate(state.acceptance_criteria):
+        if idx > 0:
+            print("Sleeping 2 seconds to avoid LLM rate limit...")
+            await asyncio.sleep(2.0)
+            
         prompt = f"""You are verifying whether a code change satisfies a specific acceptance criterion.
 
 Acceptance criterion: {criterion}
