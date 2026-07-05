@@ -32,3 +32,6 @@ build-backend = "hatchling.build"
 agent_module = "agent.agent"
 app_attribute = "app"
 playground_port = 8080
+
+[tool.hatch.build.targets.wheel]
+packages = ["agent"]
