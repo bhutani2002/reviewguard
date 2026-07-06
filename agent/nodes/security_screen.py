@@ -6,13 +6,13 @@ from agent.mock_utils import MOCK_MODE, load_mock_fixture
 # Regex patterns
 SECRETS_PATTERNS = {
     "AWS Key": r"AKIA[0-9A-Z]{16}",
-    "GitHub Token": r"gh[p|o|u|r]_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9_]{82}",
+    "GitHub Token": r"gh[p|o|u|r]_[a-zA-Z0-9]{30,40}|github_pat_[a-zA-Z0-9_]{82}",
     "Generic API Key": r"(?:api_key|api-key|apikey|secret|password|passwd|token)\s*[:=]\s*[\'\"]([a-zA-Z0-9\-_\+\/=]{20,})[\'\"]"
 }
 
 PROMPT_INJECTION_PATTERNS = [
-    r"ignore\s+previous\s+instructions",
-    r"disregard\s+your\s+system\s+prompt",
+    r"ignore\s+(?:any\s+|your\s+|my\s+)?previous\s+instructions",
+    r"disregard\s+(?:any\s+|your\s+|my\s+)?system\s+prompt",
     r"you\s+are\s+now",
     r"forget\s+everything",
     r"new\s+persona"

@@ -1,3 +1,4 @@
+import os
 import base64
 import json
 import fnmatch
@@ -59,22 +60,39 @@ async def memory_loader_node(state: AgentState) -> AgentState:
     if MOCK_MODE:
         state.team_decisions = load_mock_fixture("team_decisions")
     else:
-        try:
-            file_data = await call_github_mcp("get_file_contents", {
-                "owner": state.repo_owner,
-                "repo": state.repo_name,
-                "path": "review-artifacts/memory/team-decisions.json",
-                "branch": state.pr_branch
-            })
-            content_str = extract_file_content(file_data)
-            if content_str:
-                decisions_data = json.loads(content_str)
-                state.team_decisions = decisions_data.get("decisions", [])
-            else:
+        # Try local filesystem path first (TARGET_REPO_PATH)
+        target_repo = os.getenv("TARGET_REPO_PATH", ".")
+        local_path = os.path.join(target_repo, "review-artifacts/memory/team-decisions.json")
+        loaded_locally = False
+        
+        if os.path.exists(local_path):
+            try:
+                print(f"Loading team-decisions.json locally from {local_path}...")
+                with open(local_path, "r", encoding="utf-8") as lf:
+                    decisions_data = json.load(lf)
+                    state.team_decisions = decisions_data.get("decisions", [])
+                    loaded_locally = True
+            except Exception as le:
+                print(f"Warning: Could not parse local team-decisions.json: {le}")
+                
+        if not loaded_locally:
+            try:
+                print("Falling back to fetching team-decisions.json remotely via GitHub API...")
+                file_data = await call_github_mcp("get_file_contents", {
+                    "owner": state.repo_owner,
+                    "repo": state.repo_name,
+                    "path": "review-artifacts/memory/team-decisions.json",
+                    "branch": state.pr_branch
+                })
+                content_str = extract_file_content(file_data)
+                if content_str:
+                    decisions_data = json.loads(content_str)
+                    state.team_decisions = decisions_data.get("decisions", [])
+                else:
+                    state.team_decisions = []
+            except Exception as e:
+                print(f"Warning: Could not load team-decisions.json: {e}")
                 state.team_decisions = []
-        except Exception as e:
-            print(f"Warning: Could not load team-decisions.json: {e}")
-            state.team_decisions = []
 
     # 2. Fetch last 20 closed PRs and get comments for mining
     print("Fetching closed PRs for memory mining...")
@@ -117,23 +135,38 @@ async def memory_loader_node(state: AgentState) -> AgentState:
     if MOCK_MODE:
         print("[MOCK] Skipped updating pattern-history.json in mock mode.")
     else:
-        print("Loading pattern-history.json from repo...")
+        target_repo = os.getenv("TARGET_REPO_PATH", ".")
+        local_history_path = os.path.join(target_repo, "review-artifacts/memory/pattern-history.json")
+        loaded_history_locally = False
         pattern_history = []
         sha = None
-        try:
-            history_data = await call_github_mcp("get_file_contents", {
-                "owner": state.repo_owner,
-                "repo": state.repo_name,
-                "path": "review-artifacts/memory/pattern-history.json",
-                "branch": state.pr_branch
-            })
-            content_str = extract_file_content(history_data)
-            sha = history_data.get("sha") if isinstance(history_data, dict) else None
-            if content_str:
-                history_json = json.loads(content_str)
-                pattern_history = history_json.get("mined_patterns", [])
-        except Exception as e:
-            print(f"Warning: Could not load pattern-history.json: {e}")
+        
+        if os.path.exists(local_history_path):
+            try:
+                print(f"Loading pattern-history.json locally from {local_history_path}...")
+                with open(local_history_path, "r", encoding="utf-8") as lf:
+                    history_json = json.load(lf)
+                    pattern_history = history_json.get("mined_patterns", [])
+                    loaded_history_locally = True
+            except Exception as le:
+                print(f"Warning: Could not parse local pattern-history.json: {le}")
+                
+        if not loaded_history_locally:
+            print("Loading pattern-history.json from repo...")
+            try:
+                history_data = await call_github_mcp("get_file_contents", {
+                    "owner": state.repo_owner,
+                    "repo": state.repo_name,
+                    "path": "review-artifacts/memory/pattern-history.json",
+                    "branch": state.pr_branch
+                })
+                content_str = extract_file_content(history_data)
+                sha = history_data.get("sha") if isinstance(history_data, dict) else None
+                if content_str:
+                    history_json = json.loads(content_str)
+                    pattern_history = history_json.get("mined_patterns", [])
+            except Exception as e:
+                print(f"Warning: Could not load pattern-history.json: {e}")
 
         # Find new mined patterns
         existing_patterns_topics = {p.get("topic") for p in pattern_history}
@@ -157,6 +190,19 @@ async def memory_loader_node(state: AgentState) -> AgentState:
         # If new patterns were added, commit the updated pattern-history.json
         if new_patterns_added:
             print("Writing updated pattern-history.json to repo...")
+            # Fetch fresh SHA from GitHub right before writing to avoid 409 Conflict
+            try:
+                history_data = await call_github_mcp("get_file_contents", {
+                    "owner": state.repo_owner,
+                    "repo": state.repo_name,
+                    "path": "review-artifacts/memory/pattern-history.json",
+                    "branch": state.pr_branch
+                })
+                if isinstance(history_data, dict) and "sha" in history_data:
+                    sha = history_data["sha"]
+            except Exception:
+                pass
+
             history_payload = {
                 "version": "1.0",
                 "last_updated": datetime.now().strftime("%Y-%m-%d"),
