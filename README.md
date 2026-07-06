@@ -1,4 +1,4 @@
-# 🔍 ReviewGuard — Confidence-Aware PR Verification Agent
+# 🔍 ReviewGuard - Confidence-Aware PR Verification Agent
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/Python-3.14-blue.svg)](https://www.python.org/)
